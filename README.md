@@ -1398,27 +1398,64 @@ function handleSpeechResult(event) {
 }
 
 function handleSpeechError(event) {
-    isRecording = false;
+    console.error('語音辨識錯誤:', event.error);
+    
+    // 重置錄音狀態
+    window.isRecording = false;
+    window.isRecordingActive = false;
+    window.isToggling = false;
+    
+    // 停止波形動畫
     stopWaveformAnimation();
     
+    // 更新UI
     const speechBtn = document.getElementById('recordButton');
-    speechBtn.classList.remove('recording');
-    speechBtn.querySelector('.record-text').textContent = '按住說話';
+    if (speechBtn) {
+        speechBtn.classList.remove('recording');
+        const textEl = speechBtn.querySelector('.record-text');
+        if (textEl) textEl.textContent = '按住說話';
+    }
     
     const resultDisplay = document.querySelector('.recognition-result');
-    resultDisplay.textContent = '無法辨識您的語音，請再試一次';
-    
-    console.error('語音辨識錯誤:', event.error);
+    if (resultDisplay) {
+        resultDisplay.textContent = '無法辨識您的語音，請再試一次';
+    }
 }
 
+// 確保頁面載入時設置模態框關閉按鈕
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化其他功能...
+    
+    // 設置模態框關閉按鈕
+    setupModalCloseButton();
+    
+    // 設置點擊模態框背景關閉
+    const modal = document.getElementById('speechRecognitionModal');
+    if (modal) {
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeSpeechModal();
+            }
+        });
+    }
+});
+
 function handleSpeechEnd() {
-    if (isRecording) {
-        isRecording = false;
-        stopWaveformAnimation();
-        
-        const speechBtn = document.getElementById('recordButton');
+    console.log('語音辨識自然結束');
+    
+    // 重置錄音狀態
+    window.isRecording = false;
+    window.isRecordingActive = false;
+    
+    // 停止波形動畫
+    stopWaveformAnimation();
+    
+    // 更新UI
+    const speechBtn = document.getElementById('recordButton');
+    if (speechBtn) {
         speechBtn.classList.remove('recording');
-        speechBtn.querySelector('.record-text').textContent = '按住說話';
+        const textEl = speechBtn.querySelector('.record-text');
+        if (textEl) textEl.textContent = '按住說話';
     }
 }
 
@@ -1530,6 +1567,12 @@ function stopWaveformAnimation() {
 
 // 添加在上面函數之後
 function showSpeechRecognitionModal() {
+    // 確保之前的錄音狀態被重置
+    stopRecording();
+    window.isRecording = false;
+    window.isRecordingActive = false;
+    window.isToggling = false;
+    
     const modal = document.getElementById('speechRecognitionModal');
     const targetDisplay = modal.querySelector('.target-word');
     
@@ -1544,6 +1587,14 @@ function showSpeechRecognitionModal() {
     
     if (oldSyllableFeedback) {
         oldSyllableFeedback.remove();
+    }
+    
+    // 重置按鈕狀態
+    const recordButton = document.getElementById('recordButton');
+    if (recordButton) {
+        recordButton.classList.remove('recording');
+        const textEl = recordButton.querySelector('.record-text');
+        if (textEl) textEl.textContent = '按住說話';
     }
     
     // 設置目標文字
@@ -1570,6 +1621,9 @@ function showSpeechRecognitionModal() {
     
     // 顯示模態框
     modal.style.display = 'block';
+    
+    // 確保模態框關閉按鈕設置正確
+    setupModalCloseButton();
 }
 
 // 添加在 showSpeechRecognitionModal 函數之後
@@ -1599,13 +1653,30 @@ function startRecording(e) {
 }
 
 function stopRecording() {
-    if (!isRecording) return;
+    console.log('嘗試停止錄音...');
     
-    try {
-        recognition.stop();
-    } catch (error) {
-        console.error('無法停止語音辨識', error);
+    if (window.recognition) {
+        try {
+            window.recognition.stop();
+            console.log('語音辨識已停止');
+        } catch (error) {
+            // 有時當語音辨識尚未開始時嘗試停止會拋出錯誤
+            console.warn('停止語音辨識時出現警告:', error);
+            
+            try {
+                // 嘗試中止作為備選方案
+                window.recognition.abort();
+            } catch (e) {
+                console.warn('中止語音辨識時出現警告:', e);
+            }
+        }
     }
+    
+    // 停止波形動畫
+    stopWaveformAnimation();
+    
+    // 重置狀態
+    window.isRecording = false;
 }
 
 function createRipple(event) {
@@ -3071,14 +3142,58 @@ window.onload = function() {
 };
 
 function setupModalCloseButton() {
+    // 選擇正確的關閉按鈕
     const closeButton = document.querySelector('.speech-close');
-    if (closeButton) {
-        closeButton.addEventListener('click', function() {
-            document.getElementById('speechRecognitionModal').style.display = 'none';
-            stopRecording();
-        });
-        console.log('模態框關閉按鈕已設置');
+    const modal = document.getElementById('speechRecognitionModal');
+    
+    if (closeButton && modal) {
+        // 確保移除舊的事件監聽器（如果有的話）
+        closeButton.removeEventListener('click', closeSpeechModal);
+        
+        // 添加新的事件監聽器
+        closeButton.addEventListener('click', closeSpeechModal);
+        console.log('語音模態框關閉按鈕已設置');
+    } else {
+        console.error('找不到語音模態框或關閉按鈕');
     }
+    
+    // 點擊模態框背景時也關閉
+    if (modal) {
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeSpeechModal();
+            }
+        });
+    }
+}
+
+// 2. 添加統一的關閉模態框函數
+function closeSpeechModal() {
+    const modal = document.getElementById('speechRecognitionModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
+    // 確保錄音狀態被重置
+    stopRecording();
+    
+    // 重置波形動畫
+    stopWaveformAnimation();
+    
+    // 重置按鈕狀態
+    const recordButton = document.getElementById('recordButton');
+    if (recordButton) {
+        recordButton.classList.remove('recording');
+        const textEl = recordButton.querySelector('.record-text');
+        if (textEl) textEl.textContent = '按住說話';
+    }
+    
+    // 重置全局狀態變量
+    window.isRecording = false;
+    window.isRecordingActive = false;
+    window.isToggling = false;
+    
+    console.log('語音模態框已關閉');
 }
 
 function setupSpeechRecognitionButton() {
