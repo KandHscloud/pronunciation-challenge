@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1172,6 +1173,8 @@
         function changeCard(direction) {
     cancelCurrentRecognition(); // 新增這行
     stopSpeaking();
+	clearSpeechResults(); // 添加這行
+
     const flashcard = document.getElementById('flashcard');
     flashcard.classList.remove('flip-right', 'flip-left');
     void flashcard.offsetWidth;
@@ -1197,6 +1200,8 @@
         function changeWord(direction) {
     		cancelCurrentRecognition(); // 新增這行
             stopSpeaking();
+			clearSpeechResults(); // 添加這行
+
             const categoryWords = vocabularyData[currentCategory];
             const flashcard = document.getElementById('flashcard');
             flashcard.classList.remove('flip-right', 'flip-left');
@@ -2426,21 +2431,26 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 語音識別結果處理
             recognition.onresult = function(event) {
-                const result = event.results[0][0].transcript.trim();
-                const targetWord = document.getElementById('wordBack').textContent;
-                
-                // 處理結果，標記錯誤部分
-                if (result.toLowerCase() === targetWord.toLowerCase()) {
-                    speechResult2.textContent = result;
-                    speechFeedback2.textContent = '太棒了！發音正確 👍';
-                    speechFeedback2.className = 'speech-feedback correct';
-                } else {
-                    // 標記錯誤部分
-                    speechResult2.innerHTML = highlightMispronunciations(result, targetWord);
-                    speechFeedback2.textContent = '再試一次！請注意標記的發音 👎';
-                    speechFeedback2.className = 'speech-feedback incorrect';
-                }
-            };
+    const result = event.results[0][0].transcript.trim();
+    const targetWord = document.getElementById('wordBack').textContent;
+    
+    // 處理結果，標記錯誤部分
+    if (result.toLowerCase() === targetWord.toLowerCase()) {
+        speechResult2.textContent = result;
+        speechFeedback2.textContent = '太棒了！發音正確 👍';
+        speechFeedback2.className = 'speech-feedback correct';
+    } else {
+        // 標記錯誤部分
+        speechResult2.innerHTML = highlightMispronunciations(result, targetWord);
+        speechFeedback2.textContent = '再試一次！請注意標記的發音 👎';
+        speechFeedback2.className = 'speech-feedback incorrect';
+    }
+    
+    // 添加自動滾動到結果區域
+    setTimeout(() => {
+        speechResult2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+};
             
             // 語音識別結束
             recognition.onend = function() {
@@ -2498,22 +2508,27 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 語音識別結果處理
             recognition.onresult = function(event) {
-                const result = event.results[0][0].transcript.trim();
-                
-                // 簡單相似度檢查
-                const similarity = calculateSimilarity(result.toLowerCase(), targetExample.toLowerCase());
-                
-                if (similarity > 0.8) {
-                    speechResult3.textContent = result;
-                    speechFeedback3.textContent = '很好！朗讀正確 👍';
-                    speechFeedback3.className = 'speech-feedback correct';
-                } else {
-                    // 標記錯誤部分
-                    speechResult3.innerHTML = highlightExampleErrors(result, targetExample);
-                    speechFeedback3.textContent = '再試一次！請注意標記的發音 👎';
-                    speechFeedback3.className = 'speech-feedback incorrect';
-                }
-            };
+    const result = event.results[0][0].transcript.trim();
+    
+    // 簡單相似度檢查
+    const similarity = calculateSimilarity(result.toLowerCase(), targetExample.toLowerCase());
+    
+    if (similarity > 0.8) {
+        speechResult3.textContent = result;
+        speechFeedback3.textContent = '很好！朗讀正確 👍';
+        speechFeedback3.className = 'speech-feedback correct';
+    } else {
+        // 標記錯誤部分
+        speechResult3.innerHTML = highlightExampleErrors(result, targetExample);
+        speechFeedback3.textContent = '再試一次！請注意標記的發音 👎';
+        speechFeedback3.className = 'speech-feedback incorrect';
+    }
+    
+    // 添加自動滾動到結果區域
+    setTimeout(() => {
+        speechResult3.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+};
             
             // 語音識別結束
             recognition.onend = function() {
@@ -2651,6 +2666,25 @@ function cancelCurrentRecognition() {
                 語音練習
             `;
         }
+    }
+}
+// 添加清空語音結果的函數
+function clearSpeechResults() {
+    const speechResult2 = document.getElementById('speechResult2');
+    const speechFeedback2 = document.getElementById('speechFeedback2');
+    const speechResult3 = document.getElementById('speechResult3');
+    const speechFeedback3 = document.getElementById('speechFeedback3');
+    
+    if (speechResult2) speechResult2.textContent = '';
+    if (speechFeedback2) {
+        speechFeedback2.textContent = '';
+        speechFeedback2.className = 'speech-feedback';
+    }
+    
+    if (speechResult3) speechResult3.textContent = '';
+    if (speechFeedback3) {
+        speechFeedback3.textContent = '';
+        speechFeedback3.className = 'speech-feedback';
     }
 }
     </script>
