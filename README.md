@@ -3212,6 +3212,11 @@ function startRecording() {
     
     // 啟動語音辨識
     try {
+        // 重要：設置onresult等事件處理器
+        window.recognition.onresult = handleSpeechResult;
+        window.recognition.onerror = handleSpeechError;
+        window.recognition.onend = handleSpeechEnd;
+        
         window.recognition.start();
         console.log('語音辨識已啟動');
     } catch (error) {
@@ -3252,10 +3257,9 @@ function stopRecording() {
         console.log('語音辨識已停止');
     } catch (error) {
         console.error('無法停止語音辨識:', error);
+        // 如果無法正常停止，手動觸發end事件
+        handleSpeechEnd();
     }
-    
-    window.isRecording = false;
-    stopWaveformAnimation();
 }
 
 function createWaveform() {
@@ -3334,7 +3338,7 @@ function stopWaveformAnimation() {
 }
 
 function handleSpeechResult(event) {
-    console.log('接收到語音辨識結果');
+    console.log('接收到語音辨識結果', event);
     window.isRecording = false;
     stopWaveformAnimation();
     
@@ -3343,6 +3347,12 @@ function handleSpeechResult(event) {
         speechBtn.classList.remove('recording');
         const textEl = speechBtn.querySelector('.record-text');
         if (textEl) textEl.textContent = '點擊開始錄音';
+    }
+    
+    // 確保結果有效
+    if (!event || !event.results || !event.results[0] || !event.results[0][0]) {
+        console.error('語音辨識結果無效');
+        return;
     }
     
     const resultDisplay = document.querySelector('.recognition-result');
@@ -3452,6 +3462,15 @@ function handleSpeechError(event) {
         resultDisplay.textContent = '無法辨識您的語音，請再試一次';
     }
     
+    // 根據錯誤類型顯示適當的錯誤信息
+    if (event.error === 'no-speech') {
+        const scoreDisplay = document.querySelector('.accuracy-score');
+        if (scoreDisplay) {
+            scoreDisplay.textContent = '未檢測到語音，請嘗試說得更清晰或靠近麥克風';
+            scoreDisplay.className = 'accuracy-score low';
+        }
+    }
+    
     // 重設錄音狀態
     window.isRecordingActive = false;
     window.isToggling = false;
@@ -3553,71 +3572,6 @@ function showSpeechRecognitionModal() {
     window.isToggling = false;
 }
 
-// 在頁面載入時進行設置
-window.onload = function() {
-    try {
-        console.log('頁面載入完成');
-        initializeFlashcards();
-        
-        // 初始化語音合成引擎
-        if (window.speechSynthesis) {
-            // 確保 getVoices 函數已載入聲音
-            if (speechSynthesis.getVoices().length === 0) {
-                speechSynthesis.onvoiceschanged = function() {
-                    console.log('語音合成引擎已初始化');
-                };
-            }
-        } else {
-            console.warn('瀏覽器不支援語音合成');
-        }
-        
-        // 初始化全局變量
-        window.isRecording = false;
-        window.isRecordingActive = false;
-        window.isToggling = false;
-        
-        // 檢查語音辨識API
-        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!window.SpeechRecognition) {
-            console.error('您的瀏覽器不支援語音辨識功能');
-        } else {
-            // 初始化語音辨識
-            initializeSpeechRecognition();
-        }
-        
-        // 設置預設分類按鈕
-        const categoryButtons = document.querySelectorAll('.category-btn');
-        categoryButtons[0].classList.add('active');
-        
-        // 初始化指示器
-        updateCardIndicators();
-        
-        // 添加觸控事件監聽
-        const flashcard = document.getElementById('flashcard');
-        flashcard.addEventListener('touchstart', handleTouchStart, false);
-        flashcard.addEventListener('touchmove', handleTouchMove, false);
-        flashcard.addEventListener('touchend', handleTouchEnd, false);
-        
-        // 添加指示器點擊事件
-        const indicators = document.querySelectorAll('.indicator');
-        indicators.forEach((indicator, index) => {
-            indicator.addEventListener('click', () => {
-                if (index !== currentCard) {
-                    changeCard(index - currentCard);
-                }
-            });
-        });
-        
-        // 初始化語音練習按鈕
-        setupSpeechRecognitionButton();
-        console.log('語音按鈕已設置');
-        
-    } catch (error) {
-        console.error('初始化錯誤:', error);
-        alert('頁面初始化出錯: ' + error.message);
-    }
-};
-
 // 初始化語音辨識
 function initializeSpeechRecognition() {
     try {
@@ -3625,6 +3579,7 @@ function initializeSpeechRecognition() {
         window.recognition.lang = 'en-US';
         window.recognition.interimResults = false;
         window.recognition.maxAlternatives = 1;
+        window.recognition.continuous = false;
         
         // 設置辨識結果處理函數
         window.recognition.onresult = handleSpeechResult;
@@ -3646,50 +3601,6 @@ function initializeSpeechRecognition() {
     } catch (error) {
         console.error('初始化語音辨識時發生錯誤:', error);
         return false;
-    }
-}
-
-// 檢查麥克風權限
-function checkMicrophoneAccess() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error('瀏覽器不支援 getUserMedia API');
-        return Promise.reject(new Error('瀏覽器不支援麥克風訪問'));
-    }
-    
-    console.log('檢查麥克風權限...');
-    return navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            console.log('成功獲取麥克風權限');
-            // 釋放流
-            stream.getTracks().forEach(track => track.stop());
-            return true;
-        })
-        .catch(err => {
-            console.error('無法獲取麥克風權限:', err);
-            return Promise.reject(err);
-        });
-}
-
-// 設置關閉模態框按鈕
-function setupModalCloseButton() {
-    const closeButton = document.querySelector('.speech-close');
-    if (closeButton) {
-        closeButton.addEventListener('click', function() {
-            const modal = document.getElementById('speechRecognitionModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-            stopRecording();
-            window.isRecordingActive = false;
-            window.isToggling = false;
-            const recordButton = document.getElementById('recordButton');
-            if (recordButton) {
-                recordButton.classList.remove('recording');
-                const textEl = recordButton.querySelector('.record-text');
-                if (textEl) textEl.textContent = '點擊開始錄音';
-            }
-        });
-        console.log('模態框關閉按鈕已設置');
     }
 }
 </script>
