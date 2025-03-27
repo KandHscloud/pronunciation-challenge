@@ -930,7 +930,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="card" id="card4">
+                <div class="card " id="card4">
                     <div class="example-container">
                         <div class="image-container" id="imageContainer2">
                             圖片預留區
@@ -1877,7 +1877,24 @@ function createRipple(event) {
                     e.stopPropagation(); // 防止觸發卡片翻轉
                     showSpeechRecognitionModal();
                 });
+
+                // 添加這些額外的事件監聽器
+                speechButton.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault(); // 阻止默認行為
+                }, { passive: false });
+
+                speechButton.addEventListener('touchmove', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }, { passive: false });
+
+                speechButton.addEventListener('touchend', (e) => {
+                    e.stopPropagation();
+                    showSpeechRecognitionModal();
+                }, { passive: false });
                 
+                // 將按鈕添加到卡片中 - 這行很重要，不能缺少
                 card.appendChild(speechButton);
             });
             
@@ -2899,33 +2916,80 @@ window.onclick = function(event) {
     }
 };
 // 初始化語音辨識
+// 初始化語音辨識
 if (initializeSpeechRecognition()) {
     console.log('語音辨識已初始化');
     
     // 設置語音練習按鈕事件
     const recordButton = document.getElementById('recordButton');
     
-    // 按住開始錄音，放開停止錄音
-    recordButton.addEventListener('mousedown', startRecording);
-    recordButton.addEventListener('touchstart', startRecording);
+    // 移除舊的事件監聽器（如果有）並重新添加
+    recordButton.replaceWith(recordButton.cloneNode(true));
     
-    recordButton.addEventListener('mouseup', stopRecording);
-    recordButton.addEventListener('touchend', stopRecording);
+    // 重新獲取按鈕
+    const newRecordButton = document.getElementById('recordButton');
     
-    // 如果滑鼠/手指移出按鈕，也停止錄音
-    recordButton.addEventListener('mouseleave', stopRecording);
-    recordButton.addEventListener('touchcancel', stopRecording);
+    // 改為點擊模式，而不是按住模式
+    let isRecordingActive = false;
+    
+    newRecordButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!isRecordingActive) {
+            console.log('開始錄音...');
+            isRecordingActive = true;
+            this.classList.add('recording');
+            this.querySelector('.record-text').textContent = '點擊停止錄音';
+            startRecording(e);
+        } else {
+            console.log('停止錄音...');
+            isRecordingActive = false;
+            this.classList.remove('recording');
+            this.querySelector('.record-text').textContent = '點擊開始錄音';
+            stopRecording();
+        }
+    });
     
     // 添加波紋效果
-    recordButton.addEventListener('mousedown', createRipple);
-    recordButton.addEventListener('touchstart', createRipple);
+    newRecordButton.addEventListener('mousedown', createRipple);
+    newRecordButton.addEventListener('touchstart', createRipple, { passive: true });
     
     // 設置關閉按鈕
     const closeButton = document.querySelector('.speech-close');
     closeButton.addEventListener('click', () => {
         document.getElementById('speechRecognitionModal').style.display = 'none';
         stopRecording();
+        isRecordingActive = false;
+        newRecordButton.classList.remove('recording');
+        newRecordButton.querySelector('.record-text').textContent = '點擊開始錄音';
     });
+    
+    // 修改 startRecording 函數，移除 mousedown/touchstart 的事件參數依賴
+    window.startRecording = function(e) {
+        if (!recognition) {
+            console.error('語音辨識未初始化');
+            return;
+        }
+        
+        isRecording = true;
+        
+        // 開始波形動畫
+        startWaveformAnimation();
+        
+        // 開始語音辨識
+        try {
+            recognition.start();
+            console.log('語音辨識已啟動');
+        } catch (error) {
+            console.error('無法啟動語音辨識', error);
+            isRecording = false;
+            newRecordButton.classList.remove('recording');
+            newRecordButton.querySelector('.record-text').textContent = '點擊開始錄音';
+            stopWaveformAnimation();
+            isRecordingActive = false;
+        }
+    };
 } else {
     console.warn('語音辨識功能無法初始化');
 }
