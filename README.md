@@ -2874,18 +2874,163 @@ window.onclick = function(event) {
         // 確保 getVoices 函數已載入聲音
         if (speechSynthesis.getVoices().length === 0) {
             speechSynthesis.onvoiceschanged = function() {
-                // 聲音已載入
                 console.log('語音合成引擎已初始化');
             };
         }
+    } else {
+        console.warn('瀏覽器不支援語音合成');
     }
     
-    // 初始化語音辨識
-    initializeSpeechRecognition();
+    // 檢查麥克風
+    checkMicrophoneAccess();
+}
+
+// 檢查麥克風權限
+function checkMicrophoneAccess() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('瀏覽器不支援 getUserMedia API');
+        return;
+    }
+    
+    console.log('檢查麥克風權限...');
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            console.log('成功獲取麥克風權限');
+            // 釋放流
+            stream.getTracks().forEach(track => track.stop());
+            // 初始化語音辨識
+            if (initializeSpeechRecognition()) {
+                console.log('語音辨識已初始化');
+            }
+        })
+        .catch(err => {
+            console.error('無法獲取麥克風權限:', err);
+        });
+}
+
+function initializeSpeechRecognition() {
+    // 檢查瀏覽器是否支援語音辨識
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!window.SpeechRecognition) {
+        console.error('您的瀏覽器不支援語音辨識功能');
+        return false;
+    }
+    
+    try {
+        window.recognition = new SpeechRecognition();
+        window.recognition.lang = 'en-US';
+        window.recognition.interimResults = false;
+        window.recognition.maxAlternatives = 1;
+        
+        // 設置辨識結果處理函數
+        window.recognition.onresult = handleSpeechResult;
+        window.recognition.onerror = handleSpeechError;
+        window.recognition.onend = handleSpeechEnd;
+        
+        // 初始化音頻分析器 (用於波形顯示)
+        initializeAudioAnalyser();
+        
+        // 設置全局狀態變量
+        window.isRecording = false;
+        window.isRecordingActive = false;
+        
+        return true;
+    } catch (error) {
+        console.error('初始化語音辨識時發生錯誤:', error);
+        return false;
+    }
+}
+
+function initializeAudioAnalyser() {
+    try {
+        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        window.analyser = window.audioContext.createAnalyser();
+        window.analyser.fftSize = 256;
+        console.log('音頻分析器初始化成功');
+    } catch (error) {
+        console.error('無法初始化音頻分析器', error);
+    }
+}
+
+function createWaveform() {
+    console.log('創建波形動畫');
+    const waveformElement = document.querySelector('.waveform');
+    if (!waveformElement) {
+        console.error('找不到波形容器');
+        return;
+    }
+    
+    waveformElement.innerHTML = '';
+    window.waveformBars = [];
+    
+    const barCount = 30;
+    
+    for (let i = 0; i < barCount; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'wave-bar';
+        bar.style.height = '5px'; // 初始高度
+        waveformElement.appendChild(bar);
+        window.waveformBars.push(bar);
+    }
+    
+    console.log(`已創建 ${barCount} 個波形條`);
+}
+
+function startWaveformAnimation() {
+    console.log('開始波形動畫');
+    const waveformElement = document.querySelector('.waveform');
+    if (!waveformElement) {
+        console.error('找不到波形容器');
+        return;
+    }
+    
+    waveformElement.classList.add('active');
+    
+    function updateWaveform() {
+        if (!window.isRecording) {
+            console.log('錄音已停止，不再更新波形');
+            return;
+        }
+        
+        // 模擬麥克風輸入
+        if (window.waveformBars && window.waveformBars.length > 0) {
+            for (let i = 0; i < window.waveformBars.length; i++) {
+                const height = Math.floor(Math.random() * 25) + 5;
+                window.waveformBars[i].style.height = `${height}px`;
+            }
+        }
+        
+        window.animationFrameId = requestAnimationFrame(updateWaveform);
+    }
+    
+    updateWaveform();
+    console.log('波形動畫已啟動');
+}
+
+function stopWaveformAnimation() {
+    console.log('停止波形動畫');
+    const waveformElement = document.querySelector('.waveform');
+    if (waveformElement) {
+        waveformElement.classList.remove('active');
+    }
+    
+    if (window.animationFrameId) {
+        cancelAnimationFrame(window.animationFrameId);
+        window.animationFrameId = null;
+    }
+    
+    // 重置所有波形條
+    if (window.waveformBars) {
+        window.waveformBars.forEach(bar => {
+            if (bar) bar.style.height = '5px';
+        });
+    }
 }
 
 window.onload = function() {
     try {
+        console.log('頁面載入完成');
         initializeFlashcards();
         initializeSpeech();
         
@@ -2901,7 +3046,7 @@ window.onload = function() {
         flashcard.addEventListener('touchstart', handleTouchStart, false);
         flashcard.addEventListener('touchmove', handleTouchMove, false);
         flashcard.addEventListener('touchend', handleTouchEnd, false);
-        	
+        
         // 添加指示器點擊事件
         const indicators = document.querySelectorAll('.indicator');
         indicators.forEach((indicator, index) => {
@@ -2914,33 +3059,39 @@ window.onload = function() {
         
         // 初始化語音練習按鈕
         setupSpeechRecognitionButton();
+        console.log('語音按鈕已設置');
+        
+        // 設置語音模態框關閉按鈕
+        setupModalCloseButton();
+        
     } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('初始化錯誤:', error);
+        alert('頁面初始化出錯: ' + error.message);
     }
 };
 
-// 設置語音辨識按鈕
-function setupSpeechRecognitionButton() {
-    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-        console.error('瀏覽器不支援語音辨識功能');
-        return;
+function setupModalCloseButton() {
+    const closeButton = document.querySelector('.speech-close');
+    if (closeButton) {
+        closeButton.addEventListener('click', function() {
+            document.getElementById('speechRecognitionModal').style.display = 'none';
+            stopRecording();
+        });
+        console.log('模態框關閉按鈕已設置');
     }
-    
+}
+
+function setupSpeechRecognitionButton() {
     const recordButton = document.getElementById('recordButton');
     if (!recordButton) {
-        console.error('找不到錄音按鈕元素');
+        console.error('找不到錄音按鈕');
         return;
     }
     
-    // 移除舊的事件監聽器（如果有）
-    const newRecordButton = recordButton.cloneNode(true);
-    recordButton.parentNode.replaceChild(newRecordButton, recordButton);
+    console.log('設置錄音按鈕事件');
     
-    // 全局變數用於追蹤錄音狀態
-    window.isRecordingActive = false;
-    
-    // 添加點擊事件監聽器
-    newRecordButton.addEventListener('click', function(e) {
+    // 直接設置事件，不複製元素
+    recordButton.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
         
@@ -2951,7 +3102,7 @@ function setupSpeechRecognitionButton() {
             window.isRecordingActive = true;
             this.classList.add('recording');
             this.querySelector('.record-text').textContent = '點擊停止錄音';
-            startRecording(e);
+            startRecording();
         } else {
             console.log('停止錄音...');
             window.isRecordingActive = false;
@@ -2962,126 +3113,67 @@ function setupSpeechRecognitionButton() {
     });
     
     // 添加波紋效果
-    newRecordButton.addEventListener('mousedown', createRipple);
-    newRecordButton.addEventListener('touchstart', createRipple, { passive: true });
-    
-    // 設置關閉按鈕
-    const closeButton = document.querySelector('.speech-close');
-    if (closeButton) {
-        closeButton.addEventListener('click', () => {
-            document.getElementById('speechRecognitionModal').style.display = 'none';
-            stopRecording();
-            window.isRecordingActive = false;
-            newRecordButton.classList.remove('recording');
-            newRecordButton.querySelector('.record-text').textContent = '點擊開始錄音';
-        });
-    }
+    recordButton.addEventListener('mousedown', createRipple);
+    recordButton.addEventListener('touchstart', createRipple, { passive: true });
 }
 
-// 初始化語音辨識
-function initializeSpeechRecognition() {
-    // 檢查瀏覽器是否支援語音辨識
-    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!window.SpeechRecognition) {
-        console.error('您的瀏覽器不支援語音辨識功能');
-        return false;
-    }
-    
-    try {
-        recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-        
-        // 設置辨識結果處理函數
-        recognition.onresult = handleSpeechResult;
-        recognition.onerror = handleSpeechError;
-        recognition.onend = handleSpeechEnd;
-        
-        // 初始化音頻分析器 (用於波形顯示)
-        initializeAudioAnalyser();
-        
-        console.log('語音辨識引擎已成功初始化');
-        return true;
-    } catch (error) {
-        console.error('初始化語音辨識時發生錯誤:', error);
-        return false;
-    }
-}
-
-function startRecording(e) {
+function startRecording() {
     console.log('嘗試開始錄音...');
     
-    // 請求麥克風權限
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            console.log('已獲取麥克風權限');
-            stream.getTracks().forEach(track => track.stop()); // 停止流，我們只需要權限
-            
-            if (!recognition) {
-                console.error('語音辨識未初始化');
-                alert('語音辨識未初始化，請重新載入頁面');
-                return;
-            }
-            
-            isRecording = true;
-            
-            // 開始波形動畫
-            startWaveformAnimation();
-            
-            // 開始語音辨識
-            try {
-                recognition.start();
-                console.log('語音辨識已啟動');
-            } catch (error) {
-                console.error('無法啟動語音辨識:', error);
-                isRecording = false;
-                const speechBtn = document.getElementById('recordButton');
-                if (speechBtn) {
-                    speechBtn.classList.remove('recording');
-                    const textEl = speechBtn.querySelector('.record-text');
-                    if (textEl) textEl.textContent = '點擊開始錄音';
-                }
-                stopWaveformAnimation();
-                window.isRecordingActive = false;
-            }
-        })
-        .catch(err => {
-            console.error('無法獲取麥克風權限:', err);
-            alert('請允許使用麥克風以便使用語音辨識功能');
-            isRecording = false;
-            const speechBtn = document.getElementById('recordButton');
-            if (speechBtn) {
-                speechBtn.classList.remove('recording');
-                const textEl = speechBtn.querySelector('.record-text');
-                if (textEl) textEl.textContent = '點擊開始錄音';
-            }
-            window.isRecordingActive = false;
-        });
+    if (!window.recognition) {
+        console.error('語音辨識未初始化');
+        alert('語音辨識未初始化，請重新載入頁面');
+        return;
+    }
+    
+    window.isRecording = true;
+    
+    // 先創建波形
+    createWaveform();
+    
+    // 開始波形動畫
+    startWaveformAnimation();
+    
+    // 開始語音辨識
+    try {
+        window.recognition.start();
+        console.log('語音辨識已啟動');
+    } catch (error) {
+        console.error('無法啟動語音辨識:', error);
+        alert('無法啟動語音辨識: ' + error.message);
+        window.isRecording = false;
+        window.isRecordingActive = false;
+        const speechBtn = document.getElementById('recordButton');
+        if (speechBtn) {
+            speechBtn.classList.remove('recording');
+            const textEl = speechBtn.querySelector('.record-text');
+            if (textEl) textEl.textContent = '點擊開始錄音';
+        }
+        stopWaveformAnimation();
+    }
 }
 
 function stopRecording() {
     console.log('嘗試停止錄音...');
-    if (!isRecording) {
+    if (!window.isRecording) {
         console.log('錄音未開始，無需停止');
         return;
     }
     
     try {
-        recognition.stop();
+        window.recognition.stop();
         console.log('語音辨識已停止');
     } catch (error) {
         console.error('無法停止語音辨識:', error);
     }
     
-    isRecording = false;
+    window.isRecording = false;
     stopWaveformAnimation();
 }
 
 function handleSpeechResult(event) {
     console.log('接收到語音辨識結果');
-    isRecording = false;
+    window.isRecording = false;
     stopWaveformAnimation();
     
     const speechBtn = document.getElementById('recordButton');
@@ -3182,7 +3274,7 @@ function handleSpeechResult(event) {
 
 function handleSpeechError(event) {
     console.error('語音辨識錯誤:', event.error);
-    isRecording = false;
+    window.isRecording = false;
     stopWaveformAnimation();
     
     const speechBtn = document.getElementById('recordButton');
@@ -3203,8 +3295,8 @@ function handleSpeechError(event) {
 
 function handleSpeechEnd() {
     console.log('語音辨識結束');
-    if (isRecording) {
-        isRecording = false;
+    if (window.isRecording) {
+        window.isRecording = false;
         stopWaveformAnimation();
         
         const speechBtn = document.getElementById('recordButton');
@@ -3273,10 +3365,10 @@ function showSpeechRecognitionModal() {
     
     // 顯示模態框
     modal.style.display = 'block';
+    
+    // 重置錄音狀態
+    window.isRecordingActive = false;
 }
-
-// 重置 window.onload 後的獨立執行代碼
-// 移除這段代碼，因為我們已經將其整合到 window.onload 和 setupSpeechRecognitionButton 函數中
 </script>
 </body>
 </html>
