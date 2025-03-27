@@ -3196,6 +3196,20 @@ function closeSpeechModal() {
     console.log('語音模態框已關閉');
 }
 
+function improveButtonStyles() {
+    // 獲取錄音按鈕
+    const recordButton = document.getElementById('recordButton');
+    if (!recordButton) return;
+    
+    // 改進按鈕樣式，增加可點擊區域和視覺反饋
+    recordButton.style.cursor = 'pointer';
+    recordButton.style.userSelect = 'none';
+    recordButton.style.webkitTapHighlightColor = 'rgba(0,0,0,0)';
+    
+    // 添加觸感反饋類（如果支援）
+    recordButton.classList.add('touch-feedback');
+}
+
 function setupSpeechRecognitionButton() {
     const recordButton = document.getElementById('recordButton');
     if (!recordButton) {
@@ -3459,4 +3473,3 @@ function requestMicrophonePermission() {
 </script>
 </body>
 </html>
-
