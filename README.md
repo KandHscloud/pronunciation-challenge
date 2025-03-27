@@ -1281,32 +1281,7 @@ let animationFrameId;
     return 3;
 }
 
-		// 添加在 initializeFlashcards 函數之前
-function initializeSpeechRecognition() {
-    // 檢查瀏覽器是否支援語音辨識
-    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!window.SpeechRecognition) {
-        console.error('您的瀏覽器不支援語音辨識功能');
-        return false;
-    }
-    
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    
-    // 設置辨識結果處理函數
-    recognition.onresult = handleSpeechResult;
-    recognition.onerror = handleSpeechError;
-    recognition.onend = handleSpeechEnd;
-    
-    // 初始化音頻分析器 (用於波形顯示)
-    initializeAudioAnalyser();
-    
-    return true;
-}
-
+		
 function initializeAudioAnalyser() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -3032,40 +3007,6 @@ function checkMicrophoneAccess() {
         .catch(err => {
             console.error('無法獲取麥克風權限:', err);
         });
-}
-
-function initializeSpeechRecognition() {
-    // 檢查瀏覽器是否支援語音辨識
-    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!window.SpeechRecognition) {
-        console.error('您的瀏覽器不支援語音辨識功能');
-        return false;
-    }
-    
-    try {
-        window.recognition = new SpeechRecognition();
-        window.recognition.lang = 'en-US';
-        window.recognition.interimResults = false;
-        window.recognition.maxAlternatives = 1;
-        
-        // 設置辨識結果處理函數
-        window.recognition.onresult = handleSpeechResult;
-        window.recognition.onerror = handleSpeechError;
-        window.recognition.onend = handleSpeechEnd;
-        
-        // 初始化音頻分析器 (用於波形顯示)
-        initializeAudioAnalyser();
-        
-        // 設置全局狀態變量
-        window.isRecording = false;
-        window.isRecordingActive = false;
-        
-        return true;
-    } catch (error) {
-        console.error('初始化語音辨識時發生錯誤:', error);
-        return false;
-    }
 }
 
 function initializeAudioAnalyser() {
