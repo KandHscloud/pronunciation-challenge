@@ -2701,6 +2701,29 @@ function clearSpeechResults() {
         speechFeedback3.className = 'speech-feedback';
     }
 }
+// 為語音結果區域添加觸控事件監聽
+function setupTouchHandling() {
+    const speechResults = document.querySelectorAll('.speech-result');
+    
+    speechResults.forEach(result => {
+        result.addEventListener('touchstart', function(e) {
+            // 只有當內容超出可見區域時才阻止傳播
+            if (this.scrollHeight > this.clientHeight) {
+                e.stopPropagation();
+            }
+        }, false);
+        
+        result.addEventListener('touchmove', function(e) {
+            // 確保當需要滾動時不傳播到父元素
+            if (this.scrollHeight > this.clientHeight) {
+                e.stopPropagation();
+            }
+        }, false);
+    });
+}
+
+// 在適當時機調用
+document.addEventListener('DOMContentLoaded', setupTouchHandling);
     </script>
 </body>
 </html>
