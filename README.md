@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -2398,9 +2397,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 單字卡語音練習
     if (speechBtn2) {
-        speechBtn2.addEventListener('click', function() {
-            if (isRecording) return;
+        speechBtn2.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
             
+            if (isRecording) return;            
             const recognition = initSpeechRecognition();
             if (!recognition) return;
             
@@ -2584,6 +2585,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         return result.trim();
+    }
+// 防止觸控事件冒泡
+    if (speechBtn2) {
+        speechBtn2.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+        });
+        
+        speechBtn2.addEventListener('touchmove', function(e) {
+            e.stopPropagation();
+        });
+        
+        speechBtn2.addEventListener('touchend', function(e) {
+            e.stopPropagation();
+        });
+    }
+
+    if (speechBtn3) {
+        speechBtn3.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+        });
+        
+        speechBtn3.addEventListener('touchmove', function(e) {
+            e.stopPropagation();
+        });
+        
+        speechBtn3.addEventListener('touchend', function(e) {
+            e.stopPropagation();
+        });
     }
 });
 
