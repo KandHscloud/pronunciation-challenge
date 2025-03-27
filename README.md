@@ -3111,36 +3111,6 @@ function setupSpeechRecognitionButton() {
     console.log('錄音按鈕事件已設置');
 }
 
-// 改進按鈕樣式
-function improveButtonStyles() {
-    const recordButton = document.getElementById('recordButton');
-    if (recordButton) {
-        // 增加按鈕的可點擊區域和視覺反饋
-        recordButton.style.cursor = 'pointer';
-        recordButton.style.userSelect = 'none';
-        recordButton.style.webkitTapHighlightColor = 'rgba(0,0,0,0)';
-        
-        // 添加:active樣式以提供直觀的視覺反饋
-        const style = document.createElement('style');
-        style.innerHTML = `
-            #recordButton:active {
-                transform: scale(0.98);
-                background-color: #4338ca !important;
-            }
-            #recordButton.recording {
-                background-color: #ef4444 !important;
-                animation: pulse 2s infinite;
-            }
-            @keyframes pulse {
-                0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-                70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
 // 單獨的點擊處理函數
 function handleRecordButtonClick(e) {
     e.preventDefault();
@@ -3181,7 +3151,18 @@ function toggleRecording(button) {
         button.classList.add('recording');
         const textEl = button.querySelector('.record-text');
         if (textEl) textEl.textContent = '點擊停止錄音';
-        startRecording();
+        
+        // 每次開始錄音前重新初始化語音辨識
+        if (initializeSpeechRecognition()) {
+            startRecording();
+        } else {
+            console.error('無法初始化語音辨識');
+            window.isRecordingActive = false;
+            window.isToggling = false;
+            button.classList.remove('recording');
+            if (textEl) textEl.textContent = '點擊開始錄音';
+            alert('無法啟動語音辨識，請確認瀏覽器支援此功能並授予麥克風權限');
+        }
     } else {
         console.log('停止錄音...');
         window.isRecordingActive = false;
@@ -3212,11 +3193,6 @@ function startRecording() {
     
     // 啟動語音辨識
     try {
-        // 重要：設置onresult等事件處理器
-        window.recognition.onresult = handleSpeechResult;
-        window.recognition.onerror = handleSpeechError;
-        window.recognition.onend = handleSpeechEnd;
-        
         window.recognition.start();
         console.log('語音辨識已啟動');
     } catch (error) {
@@ -3245,336 +3221,27 @@ function startRecording() {
     }
 }
 
-function stopRecording() {
-    console.log('嘗試停止錄音...');
-    if (!window.isRecording) {
-        console.log('錄音未開始，無需停止');
-        return;
-    }
-    
-    try {
-        window.recognition.stop();
-        console.log('語音辨識已停止');
-    } catch (error) {
-        console.error('無法停止語音辨識:', error);
-        // 如果無法正常停止，手動觸發end事件
-        handleSpeechEnd();
-    }
-}
-
-function createWaveform() {
-    console.log('創建波形動畫');
-    const waveformElement = document.querySelector('.waveform');
-    if (!waveformElement) {
-        console.error('找不到波形容器');
-        return;
-    }
-    
-    waveformElement.innerHTML = '';
-    window.waveformBars = [];
-    
-    const barCount = 30;
-    
-    for (let i = 0; i < barCount; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'wave-bar';
-        bar.style.height = '5px'; // 初始高度
-        waveformElement.appendChild(bar);
-        window.waveformBars.push(bar);
-    }
-    
-    console.log(`已創建 ${barCount} 個波形條`);
-}
-
-function startWaveformAnimation() {
-    console.log('開始波形動畫');
-    const waveformElement = document.querySelector('.waveform');
-    if (!waveformElement) {
-        console.error('找不到波形容器');
-        return;
-    }
-    
-    waveformElement.classList.add('active');
-    
-    function updateWaveform() {
-        if (!window.isRecording) {
-            console.log('錄音已停止，不再更新波形');
-            return;
-        }
-        
-        // 模擬麥克風輸入
-        if (window.waveformBars && window.waveformBars.length > 0) {
-            for (let i = 0; i < window.waveformBars.length; i++) {
-                const height = Math.floor(Math.random() * 25) + 5;
-                window.waveformBars[i].style.height = `${height}px`;
-            }
-        }
-        
-        window.animationFrameId = requestAnimationFrame(updateWaveform);
-    }
-    
-    updateWaveform();
-    console.log('波形動畫已啟動');
-}
-
-function stopWaveformAnimation() {
-    console.log('停止波形動畫');
-    const waveformElement = document.querySelector('.waveform');
-    if (waveformElement) {
-        waveformElement.classList.remove('active');
-    }
-    
-    if (window.animationFrameId) {
-        cancelAnimationFrame(window.animationFrameId);
-        window.animationFrameId = null;
-    }
-    
-    // 重置所有波形條
-    if (window.waveformBars) {
-        window.waveformBars.forEach(bar => {
-            if (bar) bar.style.height = '5px';
-        });
-    }
-}
-
-function handleSpeechResult(event) {
-    console.log('接收到語音辨識結果', event);
-    window.isRecording = false;
-    stopWaveformAnimation();
-    
-    const speechBtn = document.getElementById('recordButton');
-    if (speechBtn) {
-        speechBtn.classList.remove('recording');
-        const textEl = speechBtn.querySelector('.record-text');
-        if (textEl) textEl.textContent = '點擊開始錄音';
-    }
-    
-    // 確保結果有效
-    if (!event || !event.results || !event.results[0] || !event.results[0][0]) {
-        console.error('語音辨識結果無效');
-        return;
-    }
-    
-    const resultDisplay = document.querySelector('.recognition-result');
-    const scoreDisplay = document.querySelector('.accuracy-score');
-    
-    if (!resultDisplay || !scoreDisplay) {
-        console.error('找不到結果顯示元素');
-        return;
-    }
-    
-    const transcript = event.results[0][0].transcript.toLowerCase().trim();
-    const confidence = event.results[0][0].confidence;
-    
-    console.log('辨識結果:', transcript, '置信度:', confidence);
-    
-    resultDisplay.textContent = `您說的是: "${transcript}"`;
-    
-    // 取得目標文字
-    let targetText = '';
-    if (currentCard === 1) {
-        // 單字練習
-        targetText = vocabularyData[currentCategory][currentWordIndex].word.toLowerCase();
-    } else {
-        // 例句練習
-        if (vocabularyData[currentCategory][currentWordIndex].examples) {
-            const exampleIndex = currentCard === 2 ? 0 : 1;
-            if (vocabularyData[currentCategory][currentWordIndex].examples.length > exampleIndex) {
-                targetText = vocabularyData[currentCategory][currentWordIndex].examples[exampleIndex].sentence.toLowerCase();
-            }
-        } else if (currentCard === 2 && vocabularyData[currentCategory][currentWordIndex].example) {
-            targetText = vocabularyData[currentCategory][currentWordIndex].example.toLowerCase();
-        }
-    }
-    
-    console.log('目標文字:', targetText);
-    
-    // 文字相似度計算
-    const similarity = calculateSimilarity(targetText, transcript);
-    const percentScore = Math.round(similarity * 100);
-    
-    console.log('相似度:', similarity, '百分比分數:', percentScore);
-    
-    // 設置顏色等級
-    let scoreClass = 'low';
-    if (percentScore >= 80) {
-        scoreClass = 'high';
-    } else if (percentScore >= 60) {
-        scoreClass = 'medium';
-    }
-    
-    scoreDisplay.textContent = `準確度: ${percentScore}%`;
-    scoreDisplay.className = 'accuracy-score ' + scoreClass;
-    
-    // 如果是單字練習，添加音節反饋
-    if (currentCard === 1 && vocabularyData[currentCategory][currentWordIndex].syllables) {
-        const syllablesContainer = document.createElement('div');
-        syllablesContainer.className = 'syllable-feedback';
-        
-        const syllables = vocabularyData[currentCategory][currentWordIndex].syllables;
-        const wordParts = splitTranscriptBySyllables(transcript, syllables);
-        
-        syllables.forEach((syllable, index) => {
-            const syllableSpan = document.createElement('span');
-            syllableSpan.className = 'syllable-item';
-            syllableSpan.textContent = syllable;
-            
-            if (wordParts[index] && wordParts[index].match) {
-                syllableSpan.classList.add('correct');
-            } else {
-                syllableSpan.classList.add('incorrect');
-            }
-            
-            syllablesContainer.appendChild(syllableSpan);
-        });
-        
-        // 清除先前的音節反饋
-        const oldSyllableFeedback = document.querySelector('.syllable-feedback');
-        if (oldSyllableFeedback) {
-            oldSyllableFeedback.remove();
-        }
-        
-        const feedbackElement = document.querySelector('.speech-feedback');
-        if (feedbackElement) {
-            feedbackElement.appendChild(syllablesContainer);
-        }
-    }
-    
-    // 重設錄音狀態
-    window.isRecordingActive = false;
-    window.isToggling = false;
-}
-
-function handleSpeechError(event) {
-    console.error('語音辨識錯誤:', event.error);
-    window.isRecording = false;
-    stopWaveformAnimation();
-    
-    const speechBtn = document.getElementById('recordButton');
-    if (speechBtn) {
-        speechBtn.classList.remove('recording');
-        const textEl = speechBtn.querySelector('.record-text');
-        if (textEl) textEl.textContent = '點擊開始錄音';
-    }
-    
-    const resultDisplay = document.querySelector('.recognition-result');
-    if (resultDisplay) {
-        resultDisplay.textContent = '無法辨識您的語音，請再試一次';
-    }
-    
-    // 根據錯誤類型顯示適當的錯誤信息
-    if (event.error === 'no-speech') {
-        const scoreDisplay = document.querySelector('.accuracy-score');
-        if (scoreDisplay) {
-            scoreDisplay.textContent = '未檢測到語音，請嘗試說得更清晰或靠近麥克風';
-            scoreDisplay.className = 'accuracy-score low';
-        }
-    }
-    
-    // 重設錄音狀態
-    window.isRecordingActive = false;
-    window.isToggling = false;
-}
-
-function handleSpeechEnd() {
-    console.log('語音辨識結束');
-    if (window.isRecording) {
-        window.isRecording = false;
-        stopWaveformAnimation();
-        
-        const speechBtn = document.getElementById('recordButton');
-        if (speechBtn) {
-            speechBtn.classList.remove('recording');
-            const textEl = speechBtn.querySelector('.record-text');
-            if (textEl) textEl.textContent = '點擊開始錄音';
-        }
-        
-        // 重設錄音狀態
-        window.isRecordingActive = false;
-        window.isToggling = false;
-    }
-}
-
-function showSpeechRecognitionModal() {
-    console.log('顯示語音辨識模態框');
-    const modal = document.getElementById('speechRecognitionModal');
-    if (!modal) {
-        console.error('找不到語音辨識模態框');
-        return;
-    }
-    
-    const targetDisplay = modal.querySelector('.target-word');
-    if (!targetDisplay) {
-        console.error('找不到目標文字顯示元素');
-        return;
-    }
-    
-    // 清除先前的結果
-    const resultDisplay = modal.querySelector('.recognition-result');
-    const scoreDisplay = modal.querySelector('.accuracy-score');
-    const oldSyllableFeedback = modal.querySelector('.syllable-feedback');
-    
-    if (resultDisplay) resultDisplay.textContent = '';
-    if (scoreDisplay) {
-        scoreDisplay.textContent = '';
-        scoreDisplay.className = 'accuracy-score';
-    }
-    
-    if (oldSyllableFeedback) {
-        oldSyllableFeedback.remove();
-    }
-    
-    // 設置目標文字
-    let targetText = '';
-    if (currentCard === 1) {
-        // 單字練習
-        targetText = vocabularyData[currentCategory][currentWordIndex].word;
-    } else {
-        // 例句練習
-        if (vocabularyData[currentCategory][currentWordIndex].examples) {
-            const exampleIndex = currentCard === 2 ? 0 : 1;
-            if (vocabularyData[currentCategory][currentWordIndex].examples.length > exampleIndex) {
-                targetText = vocabularyData[currentCategory][currentWordIndex].examples[exampleIndex].sentence;
-            }
-        } else if (currentCard === 2 && vocabularyData[currentCategory][currentWordIndex].example) {
-            targetText = vocabularyData[currentCategory][currentWordIndex].example;
-        }
-    }
-    
-    targetDisplay.textContent = targetText;
-    console.log('設置目標文字:', targetText);
-    
-    // 創建波形
-    createWaveform();
-    
-    // 設置關閉按鈕
-    const closeButton = modal.querySelector('.speech-close');
-    if (closeButton) {
-        closeButton.onclick = function() {
-            modal.style.display = 'none';
-            stopRecording();
-            window.isRecordingActive = false;
-            window.isToggling = false;
-            const recordButton = document.getElementById('recordButton');
-            if (recordButton) {
-                recordButton.classList.remove('recording');
-                const textEl = recordButton.querySelector('.record-text');
-                if (textEl) textEl.textContent = '點擊開始錄音';
-            }
-        };
-    }
-    
-    // 顯示模態框
-    modal.style.display = 'block';
-    
-    // 重置錄音狀態
-    window.isRecordingActive = false;
-    window.isToggling = false;
-}
-
 // 初始化語音辨識
 function initializeSpeechRecognition() {
     try {
+        // 檢查是否已經有一個語音辨識實例正在運行
+        if (window.recognition) {
+            try {
+                window.recognition.abort();
+            } catch (e) {
+                console.warn('嘗試中止現有語音辨識時出錯:', e);
+            }
+        }
+
+        // 確保 SpeechRecognition API 可用
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!window.SpeechRecognition) {
+            console.error('瀏覽器不支援 SpeechRecognition API');
+            return false;
+        }
+        
+        // 創建新的語音辨識實例
         window.recognition = new SpeechRecognition();
         window.recognition.lang = 'en-US';
         window.recognition.interimResults = false;
@@ -3586,16 +3253,6 @@ function initializeSpeechRecognition() {
         window.recognition.onerror = handleSpeechError;
         window.recognition.onend = handleSpeechEnd;
         
-        // 初始化音頻分析器 (用於波形顯示)
-        try {
-            window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            window.analyser = window.audioContext.createAnalyser();
-            window.analyser.fftSize = 256;
-            console.log('音頻分析器初始化成功');
-        } catch (error) {
-            console.error('無法初始化音頻分析器', error);
-        }
-        
         console.log('語音辨識引擎已成功初始化');
         return true;
     } catch (error) {
@@ -3603,6 +3260,88 @@ function initializeSpeechRecognition() {
         return false;
     }
 }
+
+// 在window.onload中，確保先請求麥克風權限
+window.onload = function() {
+    try {
+        console.log('頁面載入完成');
+        initializeFlashcards();
+        
+        // 初始化語音合成引擎
+        if (window.speechSynthesis) {
+            // 確保 getVoices 函數已載入聲音
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.onvoiceschanged = function() {
+                    console.log('語音合成引擎已初始化');
+                };
+            }
+        } else {
+            console.warn('瀏覽器不支援語音合成');
+        }
+        
+        // 初始化全局變量
+        window.isRecording = false;
+        window.isRecordingActive = false;
+        window.isToggling = false;
+        
+        // 提前請求麥克風權限
+        requestMicrophonePermission()
+            .then(() => {
+                console.log('已獲得麥克風權限');
+                // 初始化語音辨識
+                initializeSpeechRecognition();
+            })
+            .catch(error => {
+                console.error('無法獲取麥克風權限:', error);
+            });
+        
+        // 設置預設分類按鈕
+        const categoryButtons = document.querySelectorAll('.category-btn');
+        categoryButtons[0].classList.add('active');
+        
+        // 初始化指示器
+        updateCardIndicators();
+        
+        // 添加觸控事件監聽
+        const flashcard = document.getElementById('flashcard');
+        flashcard.addEventListener('touchstart', handleTouchStart, false);
+        flashcard.addEventListener('touchmove', handleTouchMove, false);
+        flashcard.addEventListener('touchend', handleTouchEnd, false);
+        
+        // 添加指示器點擊事件
+        const indicators = document.querySelectorAll('.indicator');
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                if (index !== currentCard) {
+                    changeCard(index - currentCard);
+                }
+            });
+        });
+        
+        // 初始化語音練習按鈕
+        setupSpeechRecognitionButton();
+        console.log('語音按鈕已設置');
+        
+    } catch (error) {
+        console.error('初始化錯誤:', error);
+        alert('頁面初始化出錯: ' + error.message);
+    }
+};
+
+// 請求麥克風權限
+function requestMicrophonePermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return Promise.reject(new Error('瀏覽器不支援獲取媒體設備'));
+    }
+    
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            // 獲取到麥克風權限後，立即停止所有軌道
+            stream.getTracks().forEach(track => track.stop());
+            return true;
+        });
+}
 </script>
 </body>
 </html>
+
