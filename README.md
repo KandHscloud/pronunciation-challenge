@@ -1317,8 +1317,10 @@ function initializeAudioAnalyser() {
     }
 }
 
-// 添加在 initializeSpeechRecognition 函數之後
 function handleSpeechResult(event) {
+    // 清除手動停止標記
+    window.manualStop = false;
+    
     isRecording = false;
     stopWaveformAnimation();
     
@@ -1328,45 +1330,64 @@ function handleSpeechResult(event) {
     
     const resultDisplay = document.querySelector('.recognition-result');
     const scoreDisplay = document.querySelector('.accuracy-score');
-    const transcript = event.results[0][0].transcript.toLowerCase().trim();
-    const confidence = event.results[0][0].confidence;
     
-    resultDisplay.textContent = `您說的是: "${transcript}"`;
-    
-    // 取得目標文字
-    let targetText = '';
-    if (currentCard === 1) {
-        // 單字練習
-        targetText = vocabularyData[currentCategory][currentWordIndex].word.toLowerCase();
-    } else {
-        // 例句練習
-        if (vocabularyData[currentCategory][currentWordIndex].examples) {
-            const exampleIndex = currentCard === 2 ? 0 : 1;
-            if (vocabularyData[currentCategory][currentWordIndex].examples.length > exampleIndex) {
-                targetText = vocabularyData[currentCategory][currentWordIndex].examples[exampleIndex].sentence.toLowerCase();
+    // 確保有結果
+    if (event.results && event.results.length > 0 && event.results[0].length > 0) {
+        const transcript = event.results[0][0].transcript.toLowerCase().trim();
+        const confidence = event.results[0][0].confidence;
+        
+        console.log('識別到的文字:', transcript);
+        console.log('識別置信度:', confidence);
+        
+        resultDisplay.textContent = `您說的是: "${transcript}"`;
+        
+        // 取得目標文字
+        let targetText = '';
+        if (currentCard === 1) {
+            // 單字練習
+            targetText = vocabularyData[currentCategory][currentWordIndex].word.toLowerCase();
+        } else {
+            // 例句練習
+            if (vocabularyData[currentCategory][currentWordIndex].examples) {
+                const exampleIndex = currentCard === 2 ? 0 : 1;
+                if (vocabularyData[currentCategory][currentWordIndex].examples.length > exampleIndex) {
+                    targetText = vocabularyData[currentCategory][currentWordIndex].examples[exampleIndex].sentence.toLowerCase();
+                }
+            } else if (currentCard === 2 && vocabularyData[currentCategory][currentWordIndex].example) {
+                targetText = vocabularyData[currentCategory][currentWordIndex].example.toLowerCase();
             }
-        } else if (currentCard === 2 && vocabularyData[currentCategory][currentWordIndex].example) {
-            targetText = vocabularyData[currentCategory][currentWordIndex].example.toLowerCase();
         }
+        
+        // 文字相似度計算
+        const similarity = calculateSimilarity(targetText, transcript);
+        const percentScore = Math.round(similarity * 100);
+        
+        // 設置顏色等級
+        let scoreClass = 'low';
+        if (percentScore >= 80) {
+            scoreClass = 'high';
+        } else if (percentScore >= 60) {
+            scoreClass = 'medium';
+        }
+        
+        scoreDisplay.textContent = `準確度: ${percentScore}%`;
+        scoreDisplay.className = 'accuracy-score ' + scoreClass;
+        
+        // 添加音節反饋
+        addSyllableFeedback(transcript);
+    } else {
+        // 沒有識別結果
+        resultDisplay.textContent = '未能識別您的語音，請再試一次';
+        scoreDisplay.textContent = '';
+        scoreDisplay.className = 'accuracy-score';
     }
-    
-    // 文字相似度計算
-    const similarity = calculateSimilarity(targetText, transcript);
-    const percentScore = Math.round(similarity * 100);
-    
-    // 設置顏色等級
-    let scoreClass = 'low';
-    if (percentScore >= 80) {
-        scoreClass = 'high';
-    } else if (percentScore >= 60) {
-        scoreClass = 'medium';
-    }
-    
-    scoreDisplay.textContent = `準確度: ${percentScore}%`;
-    scoreDisplay.className = 'accuracy-score ' + scoreClass;
-    
-    // 如果是單字練習，添加音節反饋
-    if (currentCard === 1 && vocabularyData[currentCategory][currentWordIndex].syllables) {
+}
+
+function addSyllableFeedback(transcript) {
+    // 如果是單字練習並且當前單字有音節信息
+    if (currentCard === 1 && 
+        vocabularyData[currentCategory][currentWordIndex].syllables) {
+        
         const syllablesContainer = document.createElement('div');
         syllablesContainer.className = 'syllable-feedback';
         
@@ -1441,7 +1462,21 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function handleSpeechEnd() {
-    console.log('語音辨識自然結束');
+    console.log('語音識別自然結束');
+    
+    // 如果還有手動停止標記，表示尚未處理結果
+    if (window.manualStop) {
+        console.log('語音識別結束但沒有結果');
+        
+        // 更新UI顯示
+        const resultDisplay = document.querySelector('.recognition-result');
+        if (resultDisplay) {
+            resultDisplay.textContent = '沒有收到語音輸入，請再試一次';
+        }
+        
+        // 清除標記
+        window.manualStop = false;
+    }
     
     // 重置錄音狀態
     window.isRecording = false;
@@ -1658,16 +1693,36 @@ function stopRecording() {
     if (window.recognition) {
         try {
             window.recognition.stop();
-            console.log('語音辨識已停止');
+            console.log('語音識別已停止');
+            
+            // 添加：手動觸發識別結果處理
+            // 這裡可以添加一個標記，表示錄音已手動停止
+            window.manualStop = true;
+            
+            // 如果在短時間內沒有收到結果，手動觸發結果分析
+            setTimeout(() => {
+                if (window.manualStop) {
+                    console.log('語音識別結果延遲，手動處理');
+                    // 清除標記
+                    window.manualStop = false;
+                    
+                    // 顯示處理中訊息
+                    const resultDisplay = document.querySelector('.recognition-result');
+                    if (resultDisplay) {
+                        resultDisplay.textContent = '正在處理您的語音...';
+                    }
+                }
+            }, 1000); // 等待1秒
+            
         } catch (error) {
-            // 有時當語音辨識尚未開始時嘗試停止會拋出錯誤
-            console.warn('停止語音辨識時出現警告:', error);
+            // 有時當語音識別尚未開始時嘗試停止會拋出錯誤
+            console.warn('停止語音識別時出現警告:', error);
             
             try {
                 // 嘗試中止作為備選方案
                 window.recognition.abort();
             } catch (e) {
-                console.warn('中止語音辨識時出現警告:', e);
+                console.warn('中止語音識別時出現警告:', e);
             }
         }
     }
@@ -3261,6 +3316,7 @@ function handleButtonTouchStart(e) {
 }
 
 // 切換錄音狀態
+// 切換錄音狀態
 function toggleRecording(button) {
     // 防止快速連續點擊
     if (window.isToggling) {
@@ -3277,20 +3333,34 @@ function toggleRecording(button) {
     if (!window.isRecordingActive) {
         console.log('開始錄音...');
         window.isRecordingActive = true;
+        window.manualStop = false; // 重置手動停止標記
+        
         button.classList.add('recording');
         const textEl = button.querySelector('.record-text');
         if (textEl) textEl.textContent = '點擊停止錄音';
         
-        // 每次開始錄音前重新初始化語音辨識
+        // 更新UI提示
+        const resultDisplay = document.querySelector('.recognition-result');
+        const scoreDisplay = document.querySelector('.accuracy-score');
+        if (resultDisplay) resultDisplay.textContent = '請開始說話...';
+        if (scoreDisplay) scoreDisplay.textContent = '';
+        
+        // 清除之前的音節反饋
+        const oldSyllableFeedback = document.querySelector('.syllable-feedback');
+        if (oldSyllableFeedback) {
+            oldSyllableFeedback.remove();
+        }
+        
+        // 每次開始錄音前重新初始化語音識別
         if (initializeSpeechRecognition()) {
             startRecording();
         } else {
-            console.error('無法初始化語音辨識');
+            console.error('無法初始化語音識別');
             window.isRecordingActive = false;
             window.isToggling = false;
             button.classList.remove('recording');
             if (textEl) textEl.textContent = '點擊開始錄音';
-            alert('無法啟動語音辨識，請確認瀏覽器支援此功能並授予麥克風權限');
+            alert('無法啟動語音識別，請確認瀏覽器支援此功能並授予麥克風權限');
         }
     } else {
         console.log('停止錄音...');
@@ -3298,6 +3368,16 @@ function toggleRecording(button) {
         button.classList.remove('recording');
         const textEl = button.querySelector('.record-text');
         if (textEl) textEl.textContent = '點擊開始錄音';
+        
+        // 設置手動停止標記
+        window.manualStop = true;
+        
+        // 顯示處理中訊息
+        const resultDisplay = document.querySelector('.recognition-result');
+        if (resultDisplay) {
+            resultDisplay.textContent = '正在處理您的語音...';
+        }
+        
         stopRecording();
     }
 }
