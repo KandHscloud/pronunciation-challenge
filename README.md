@@ -778,6 +778,20 @@
         box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
     }
 }
+/* 將此CSS添加到您的樣式表中 */
+.speech-result {
+    min-height: 40px;
+    max-height: 60px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* 為iOS提供流暢滾動 */
+    position: relative;
+    z-index: 10; /* 確保在滾動層級正確 */
+}
+
+/* 改善觸控體驗 */
+.example-text {
+    -webkit-overflow-scrolling: touch;
+}
 </style>
 </head>
 <body>
