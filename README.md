@@ -1437,23 +1437,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function handleSpeechEnd() {
-    console.log('語音識別自然結束');
+    console.log('語音辨識自然結束');
     
-    // 如果還有手動停止標記，表示尚未處理結果
+    // 檢查是否是手動停止但沒有收到結果
     if (window.manualStop) {
-        console.log('語音識別結束但沒有結果');
+        console.log('語音辨識結束但沒有結果');
         
-        // 更新UI顯示
+        // 更新UI
         const resultDisplay = document.querySelector('.recognition-result');
         if (resultDisplay) {
-            resultDisplay.textContent = '沒有收到語音輸入，請再試一次';
+            resultDisplay.textContent = '沒有收到語音輸入，請確保麥克風正常並再試一次';
         }
         
         // 清除標記
         window.manualStop = false;
     }
     
-    // 重置錄音狀態
+    // 重置狀態
     window.isRecording = false;
     window.isRecordingActive = false;
     
@@ -1468,6 +1468,7 @@ function handleSpeechEnd() {
         if (textEl) textEl.textContent = '按住說話';
     }
 }
+
 
 // 計算文字相似度 (使用 Levenshtein 距離)
 function calculateSimilarity(str1, str2) {
@@ -1663,52 +1664,51 @@ function startRecording(e) {
 }
 
 function stopRecording() {
-    console.log('嘗試停止錄音...');
+    console.log('嘗試停止語音辨識...');
     
-    if (window.recognition) {
-        try {
-            window.recognition.stop();
-            console.log('語音識別已停止');
-            
-            // 添加：手動觸發識別結果處理
-            // 這裡可以添加一個標記，表示錄音已手動停止
-            window.manualStop = true;
-            
-            // 如果在短時間內沒有收到結果，手動觸發結果分析
-            setTimeout(() => {
-                if (window.manualStop) {
-                    console.log('語音識別結果延遲，手動處理');
-                    // 清除標記
-                    window.manualStop = false;
-                    
-                    // 顯示處理中訊息
-                    const resultDisplay = document.querySelector('.recognition-result');
-                    if (resultDisplay) {
-                        resultDisplay.textContent = '正在處理您的語音...';
-                    }
+    if (!window.recognition) {
+        console.error('語音辨識未初始化');
+        return;
+    }
+    
+    // 設置標記，表示錄音手動停止
+    window.manualStop = true;
+    
+    try {
+        // 停止語音辨識
+        window.recognition.stop();
+        console.log('語音辨識停止命令已發送');
+        
+        // 如果在一定時間內沒有收到結果，顯示錯誤信息
+        setTimeout(() => {
+            if (window.manualStop) {
+                console.log('未收到語音辨識結果，可能沒有檢測到語音');
+                
+                // 手動觸發錯誤處理
+                window.manualStop = false;
+                
+                const resultDisplay = document.querySelector('.recognition-result');
+                if (resultDisplay) {
+                    resultDisplay.textContent = '沒有收到語音輸入，請確保麥克風正常並再試一次';
                 }
-            }, 1000); // 等待1秒
-            
-        } catch (error) {
-            // 有時當語音識別尚未開始時嘗試停止會拋出錯誤
-            console.warn('停止語音識別時出現警告:', error);
-            
-            try {
-                // 嘗試中止作為備選方案
-                window.recognition.abort();
-            } catch (e) {
-                console.warn('中止語音識別時出現警告:', e);
             }
+        }, 1000);
+    } catch (error) {
+        console.warn('停止語音辨識時出錯:', error);
+        
+        try {
+            window.recognition.abort();
+        } catch (e) {
+            console.warn('中止語音辨識時出錯:', e);
         }
     }
     
     // 停止波形動畫
     stopWaveformAnimation();
     
-    // 重置狀態
+    // 重置錄音狀態
     window.isRecording = false;
 }
-
 function createRipple(event) {
     const button = event.currentTarget;
     
@@ -3094,49 +3094,6 @@ function stopWaveformAnimation() {
         });
     }
 }
-
-window.onload = function() {
-    try {
-        console.log('頁面載入完成');
-        initializeFlashcards();
-        initializeSpeech();
-        
-        // 設置預設分類按鈕
-        const categoryButtons = document.querySelectorAll('.category-btn');
-        categoryButtons[0].classList.add('active');
-        
-        // 初始化指示器
-        updateCardIndicators();
-        
-        // 添加觸控事件監聽
-        const flashcard = document.getElementById('flashcard');
-        flashcard.addEventListener('touchstart', handleTouchStart, false);
-        flashcard.addEventListener('touchmove', handleTouchMove, false);
-        flashcard.addEventListener('touchend', handleTouchEnd, false);
-        
-        // 添加指示器點擊事件
-        const indicators = document.querySelectorAll('.indicator');
-        indicators.forEach((indicator, index) => {
-            indicator.addEventListener('click', () => {
-                if (index !== currentCard) {
-                    changeCard(index - currentCard);
-                }
-            });
-        });
-        
-        // 初始化語音練習按鈕
-        setupSpeechRecognitionButton();
-        console.log('語音按鈕已設置');
-        
-        // 設置語音模態框關閉按鈕
-        setupModalCloseButton();
-        
-    } catch (error) {
-        console.error('初始化錯誤:', error);
-        alert('頁面初始化出錯: ' + error.message);
-    }
-};
-
 function setupModalCloseButton() {
     // 選擇正確的關閉按鈕
     const closeButton = document.querySelector('.speech-close');
@@ -3257,7 +3214,6 @@ function handleButtonTouchStart(e) {
 }
 
 // 切換錄音狀態
-// 切換錄音狀態
 function toggleRecording(button) {
     // 防止快速連續點擊
     if (window.isToggling) {
@@ -3269,104 +3225,101 @@ function toggleRecording(button) {
     
     setTimeout(() => {
         window.isToggling = false;
-    }, 300); // 300ms防抖處理
+    }, 300);
+    
+    console.log('當前錄音狀態:', window.isRecordingActive);
     
     if (!window.isRecordingActive) {
+        // 開始錄音
         console.log('開始錄音...');
         window.isRecordingActive = true;
-        window.manualStop = false; // 重置手動停止標記
+        window.manualStop = false;
         
+        // 更新UI
         button.classList.add('recording');
         const textEl = button.querySelector('.record-text');
         if (textEl) textEl.textContent = '點擊停止錄音';
         
-        // 更新UI提示
+        // 更新狀態顯示
         const resultDisplay = document.querySelector('.recognition-result');
-        const scoreDisplay = document.querySelector('.accuracy-score');
         if (resultDisplay) resultDisplay.textContent = '請開始說話...';
+        
+        // 清除先前的結果
+        const scoreDisplay = document.querySelector('.accuracy-score');
         if (scoreDisplay) scoreDisplay.textContent = '';
         
-        // 清除之前的音節反饋
         const oldSyllableFeedback = document.querySelector('.syllable-feedback');
-        if (oldSyllableFeedback) {
-            oldSyllableFeedback.remove();
-        }
+        if (oldSyllableFeedback) oldSyllableFeedback.remove();
         
-        // 每次開始錄音前重新初始化語音識別
-        if (initializeSpeechRecognition()) {
-            startRecording();
-        } else {
-            console.error('無法初始化語音識別');
-            window.isRecordingActive = false;
-            window.isToggling = false;
-            button.classList.remove('recording');
-            if (textEl) textEl.textContent = '點擊開始錄音';
-            alert('無法啟動語音識別，請確認瀏覽器支援此功能並授予麥克風權限');
-        }
+        // 啟動錄音
+        startRecording();
     } else {
+        // 停止錄音
         console.log('停止錄音...');
         window.isRecordingActive = false;
+        
+        // 更新UI
         button.classList.remove('recording');
         const textEl = button.querySelector('.record-text');
-        if (textEl) textEl.textContent = '點擊開始錄音';
+        if (textEl) textEl.textContent = '按住說話';
         
-        // 設置手動停止標記
-        window.manualStop = true;
-        
-        // 顯示處理中訊息
+        // 設置處理中狀態
         const resultDisplay = document.querySelector('.recognition-result');
-        if (resultDisplay) {
-            resultDisplay.textContent = '正在處理您的語音...';
-        }
+        if (resultDisplay) resultDisplay.textContent = '正在處理您的語音...';
         
+        // 停止錄音
         stopRecording();
     }
 }
 
 function startRecording() {
-    console.log('嘗試開始錄音...');
+    console.log('嘗試啟動語音辨識...');
     
+    // 確保 recognition 已初始化
     if (!window.recognition) {
         console.error('語音辨識未初始化');
-        alert('語音辨識未初始化，請重新載入頁面');
-        window.isRecordingActive = false;
-        window.isToggling = false;
         return;
     }
     
-    // 立即設置錄音狀態和視覺反饋
+    // 設置錄音狀態
     window.isRecording = true;
     
-    // 立即創建和啟動波形動畫，不等待語音辨識啟動
+    // 創建和啟動波形動畫
     createWaveform();
     startWaveformAnimation();
     
     // 啟動語音辨識
     try {
+        // 先重置任何正在進行的語音辨識
+        try {
+            window.recognition.abort();
+        } catch (e) {
+            console.warn('中止先前的語音辨識可能出錯:', e);
+        }
+        
+        // 啟動新的語音辨識
         window.recognition.start();
         console.log('語音辨識已啟動');
     } catch (error) {
-        console.error('無法啟動語音辨識:', error);
+        console.error('啟動語音辨識失敗:', error);
         
-        // 如果發生錯誤，重置狀態
+        // 重置狀態
         window.isRecording = false;
         window.isRecordingActive = false;
-        window.isToggling = false;
+        stopWaveformAnimation();
         
+        // 更新UI
         const speechBtn = document.getElementById('recordButton');
         if (speechBtn) {
             speechBtn.classList.remove('recording');
             const textEl = speechBtn.querySelector('.record-text');
-            if (textEl) textEl.textContent = '點擊開始錄音';
+            if (textEl) textEl.textContent = '按住說話';
         }
         
-        stopWaveformAnimation();
-        
-        // 顯示更友好的錯誤信息
-        if (error.name === 'NotAllowedError') {
-            alert('請允許使用麥克風以便使用語音辨識功能');
-        } else {
-            alert('語音辨識啟動失敗: ' + (error.message || '未知錯誤'));
+        // 顯示錯誤
+        const resultDisplay = document.querySelector('.recognition-result');
+        if (resultDisplay) {
+            resultDisplay.textContent = '無法啟動語音辨識，請重試';
         }
     }
 }
@@ -3393,10 +3346,21 @@ function initializeSpeechRecognition() {
         
         // 創建新的語音辨識實例
         window.recognition = new SpeechRecognition();
-        window.recognition.lang = 'en-US';
-        window.recognition.interimResults = false;
-        window.recognition.maxAlternatives = 1;
-        window.recognition.continuous = false;
+        
+        // 檢測是否為 Safari 瀏覽器
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isSafari) {
+            console.log('檢測到 Safari 瀏覽器，進行特殊設置');
+            window.recognition.lang = 'en-US';
+            window.recognition.interimResults = true; // Safari 下設為 true 可能更可靠
+            window.recognition.maxAlternatives = 3;  // 提供更多替代結果
+            window.recognition.continuous = false;
+        } else {
+            window.recognition.lang = 'en-US';
+            window.recognition.interimResults = false;
+            window.recognition.maxAlternatives = 1;
+            window.recognition.continuous = false;
+        }
         
         // 設置辨識結果處理函數
         window.recognition.onresult = handleSpeechResult;
@@ -3415,6 +3379,20 @@ function initializeSpeechRecognition() {
 window.onload = function() {
     try {
         console.log('頁面載入完成');
+        
+        // 檢查瀏覽器支援
+        console.log('SpeechRecognition 支援:', 
+                    !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+        console.log('MediaDevices 支援:', 
+                    !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+        
+        // 初始化全局變量
+        window.isRecording = false;
+        window.isRecordingActive = false;
+        window.isToggling = false;
+        window.manualStop = false;
+        
+        // 初始化卡片
         initializeFlashcards();
         
         // 初始化語音合成引擎
@@ -3428,11 +3406,6 @@ window.onload = function() {
         } else {
             console.warn('瀏覽器不支援語音合成');
         }
-        
-        // 初始化全局變量
-        window.isRecording = false;
-        window.isRecordingActive = false;
-        window.isToggling = false;
         
         // 提前請求麥克風權限
         requestMicrophonePermission()
@@ -3472,6 +3445,9 @@ window.onload = function() {
         setupSpeechRecognitionButton();
         console.log('語音按鈕已設置');
         
+        // 設置語音模態框關閉按鈕
+        setupModalCloseButton();
+        
     } catch (error) {
         console.error('初始化錯誤:', error);
         alert('頁面初始化出錯: ' + error.message);
@@ -3494,3 +3470,4 @@ function requestMicrophonePermission() {
 </script>
 </body>
 </html>
+
